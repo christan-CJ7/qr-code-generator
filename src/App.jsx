@@ -1,91 +1,15 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import "./App.css";
 
-const HISTORY_KEY = "qr-generator-history";
-const MAX_HISTORY = 10;
-
-const defaultSettings = {
-  text: "",
-  foreground: "#111827",
-  background: "#ffffff",
+const DEFAULT_SETTINGS = {
+  foreground: "#000000",
+  background: "#FFFFFF",
   size: 300,
-  margin: 4,
+  margin: 2,
   errorCorrection: "H",
 };
-
-function readHistory() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
-    return Array.isArray(saved) ? saved.slice(0, MAX_HISTORY) : [];
-  } catch {
-    return [];
-  }
-}
-
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = src;
-  });
-}
-
-async function makeQrImage(text, settings, logo) {
-  const options = {
-    width: Number(settings.size),
-    margin: Number(settings.margin),
-    errorCorrectionLevel: settings.errorCorrection,
-    color: {
-      dark: settings.foreground,
-      light: settings.background,
-    },
-  };
-
-  const qrDataUrl = await QRCode.toDataURL(text, options);
-
-  if (!logo) return qrDataUrl;
-
-  const qrImage = await loadImage(qrDataUrl);
-  const canvas = document.createElement("canvas");
-  canvas.width = qrImage.naturalWidth;
-  canvas.height = qrImage.naturalHeight;
-
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(qrImage, 0, 0);
-
-  const logoImage = await loadImage(logo);
-  const logoSize = canvas.width * 0.19;
-  const padding = canvas.width * 0.025;
-  const cardSize = logoSize + padding * 2;
-  const x = (canvas.width - cardSize) / 2;
-  const y = (canvas.height - cardSize) / 2;
-
-  // White backing helps separate the logo from QR modules.
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.roundRect(x, y, cardSize, cardSize, canvas.width * 0.025);
-  ctx.fill();
-
-  const scale = Math.min(
-    logoSize / logoImage.naturalWidth,
-    logoSize / logoImage.naturalHeight
-  );
-  const width = logoImage.naturalWidth * scale;
-  const height = logoImage.naturalHeight * scale;
-
-  ctx.drawImage(
-    logoImage,
-    (canvas.width - width) / 2,
-    (canvas.height - height) / 2,
-    width,
-    height
-  );
-
-  return canvas.toDataURL("image/png");
-}
 
 
 function getColorName(hex) {
@@ -103,107 +27,92 @@ function getColorName(hex) {
   return colors[hex.toUpperCase()] || hex.toUpperCase();
 }
 
-export default function App() {
-  const [settings, setSettings] = useState(defaultSettings);
-  const [logo, setLogo] = useState("");
+function App() {
+  const [text, setText] = useState("");
   const [qrImage, setQrImage] = useState("");
-  const [history, setHistory] = useState(readHistory);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const fileRef = useRef(null);
+  const [location, setLocation] = useState("");
+
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  const [history, setHistory] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("qrHistory") || "[]");
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-    } catch {
-      setError("Browser storage is full. Clear some QR history and try again.");
-    }
+    localStorage.setItem("qrHistory", JSON.stringify(history));
   }, [history]);
 
-  function updateSetting(name, value) {
-    setSettings((current) => ({ ...current, [name]: value }));
-  }
+  const updateSetting = (name, value) => {
+    setSettings((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
 
-  async function generateQr(text = settings.text, restoreSettings = null) {
-    const cleanText = text.trim();
+  const generateQR = async (
+    value = text,
+    customSettings = settings
+  ) => {
+    const cleanText = value.trim();
 
     if (!cleanText) {
-      setError("Enter some text or a URL first.");
+      setError("Please enter text or a URL first.");
+      setQrImage("");
       return;
     }
 
+    setLoading(true);
     setError("");
-    setGenerating(true);
-
-    const activeSettings = restoreSettings || settings;
 
     try {
-      const image = await makeQrImage(cleanText, activeSettings, logo);
+      const image = await QRCode.toDataURL(cleanText, {
+        width: Number(customSettings.size),
+        margin: Number(customSettings.margin),
+        errorCorrectionLevel: customSettings.errorCorrection,
+        color: {
+          dark: customSettings.foreground,
+          light: customSettings.background,
+        },
+      });
+
       setQrImage(image);
 
-      const entry = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        text: cleanText,
-        foreground: activeSettings.foreground,
-        background: activeSettings.background,
-        size: Number(activeSettings.size),
-        margin: Number(activeSettings.margin),
-        errorCorrection: activeSettings.errorCorrection,
-        createdAt: new Date().toISOString(),
-      };
+      setHistory((previous) => {
+        const newEntry = {
+          id: Date.now(),
+          text: cleanText,
+          image,
+          settings: { ...customSettings },
+          createdAt: new Date().toLocaleString(),
+        };
 
-      setHistory((current) =>
-        [entry, ...current.filter((item) => item.text !== cleanText)]
-          .slice(0, MAX_HISTORY)
+        return [
+          newEntry,
+          ...previous.filter((item) => item.text !== cleanText),
+        ].slice(0, 10);
+      });
+    } catch (err) {
+      console.error(err);
+      setError(
+        "Could not generate the QR code. Please check your input and settings."
       );
-    } catch {
-      setError("Couldn't generate the QR code. Try different settings or a smaller logo.");
+      setQrImage("");
     } finally {
-      setGenerating(false);
+      setLoading(false);
     }
-  }
+  };
 
-  function handleLogo(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setError("Please select an image file.");
+  const downloadQR = () => {
+    if (!qrImage) {
+      setError("Generate a QR code before downloading.");
       return;
     }
-
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Please choose a logo smaller than 2 MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setLogo(String(reader.result));
-      setError("");
-    };
-    reader.onerror = () => setError("Unable to read that image.");
-    reader.readAsDataURL(file);
-  }
-
-  function restoreEntry(entry) {
-    const restored = {
-      text: entry.text,
-      foreground: entry.foreground,
-      background: entry.background,
-      size: entry.size,
-      margin: entry.margin,
-      errorCorrection: entry.errorCorrection,
-    };
-
-    setSettings(restored);
-    generateQr(entry.text, restored);
-  }
-
-  function downloadQr() {
-    if (!qrImage) return;
 
     const link = document.createElement("a");
     link.href = qrImage;
@@ -211,290 +120,327 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     link.remove();
-  }
+  };
 
-  function clearHistory() {
-    setHistory([]);
-    try {
-      localStorage.removeItem(HISTORY_KEY);
-    } catch {
-      // The in-memory history is still cleared.
+  const loadHistoryItem = (item) => {
+    setText(item.text);
+    setSettings(item.settings || DEFAULT_SETTINGS);
+    setQrImage(item.image);
+    setError("");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const deleteHistoryItem = (id) => {
+    setHistory((previous) =>
+      previous.filter((item) => item.id !== id)
+    );
+  };
+
+  const clearHistory = () => {
+    if (window.confirm("Are you sure you want to clear your QR history?")) {
+      setHistory([]);
     }
-  }
+  };
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#" aria-label="QR Studio home">
-          <span className="brand-icon">▦</span>
-          <span>QR Studio</span>
-        </a>
-        <span className="topbar-label">Free QR Code Generator</span>
+    <div className="app">
+      <header className="header">
+        <div className="brand">
+          <div className="brand-icon">CJ</div>
+          <span>CJ7</span>
+        </div>
+        <span className="header-label">Free QR Code Generator</span>
       </header>
 
-      <section className="hero">
-        <span className="eyebrow">CREATE · CUSTOMIZE · SHARE</span>
-        <h1>Your ideas, one scan away.</h1>
-        <p>
-          Create custom QR codes for links, text, and more.
-          Add your brand and download in seconds.
-        </p>
-      </section>
+      <main className="main">
+        <section className="hero">
+          <span className="eyebrow">SIMPLE · FAST · FREE</span>
 
-      <section className="workspace">
-        <div className="panel editor-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Create your QR code</h2>
-              <p>Enter your content and make it yours.</p>
-            </div>
-            <span className="step-number">01</span>
-          </div>
+          <h1>
+            Create your own
+            <span> QR code.</span>
+          </h1>
 
-          <label className="field-label" htmlFor="qr-text">
-            Text or website URL
-          </label>
-          <textarea
-            id="qr-text"
-            value={settings.text}
-            onChange={(event) => updateSetting("text", event.target.value)}
-            placeholder="https://yourwebsite.com"
-            rows={3}
-          />
+          <p>
+            Turn links, text, and other information into a QR code
+            you can download and share.
+          </p>
+        </section>
 
-          <div className="field-row">
-            <div className="field">
-              <label className="field-label" htmlFor="foreground">
-                QR color
-              </label>
-              <div className="color-control">
-                <input
-                  id="foreground"
-                  type="color"
-                  value={settings.foreground}
-                  onChange={(event) =>
-                    updateSetting("foreground", event.target.value)
-                  }
-                />
-                <span>{getColorName(settings.foreground)}</span>
+        <section className="workspace">
+          <div className="panel input-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="step">STEP 01</span>
+                <h2>Enter your content</h2>
               </div>
+              <span className="heading-icon">✎</span>
             </div>
-            <div className="field">
-              <label className="field-label" htmlFor="background">
-                Background
-              </label>
-              <div className="color-control">
-                <input
-                  id="background"
-                  type="color"
-                  value={settings.background}
-                  onChange={(event) =>
-                    updateSetting("background", event.target.value)
-                  }
-                />
-                <span>{getColorName(settings.background)}</span>
-              </div>
-            </div>
-          </div>
 
-          <div className="field">
-            <div className="range-heading">
-              <label className="field-label" htmlFor="size">
-                QR code size
-              </label>
-              <span>{settings.size} px</span>
-            </div>
-            <input
-              id="size"
-              className="range-input"
-              type="range"
-              min="200"
-              max="800"
-              step="50"
-              value={settings.size}
-              onChange={(event) =>
-                updateSetting("size", Number(event.target.value))
-              }
+            <label htmlFor="qrText">Text or URL</label>
+
+            <textarea
+              id="qrText"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="https://example.com or enter any text..."
+              rows={4}
             />
-          </div>
 
-          <div className="field-row">
-            <div className="field">
-              <label className="field-label" htmlFor="margin">
-                Quiet-zone margin
-              </label>
-              <select
-                id="margin"
-                value={settings.margin}
-                onChange={(event) =>
-                  updateSetting("margin", Number(event.target.value))
-                }
-              >
-                <option value="1">Small</option>
-                <option value="2">Medium</option>
-                <option value="4">Standard</option>
-                <option value="6">Large</option>
-                <option value="8">Extra large</option>
-              </select>
+            <div className="settings-heading">
+              <span className="step">STEP 02</span>
+              <h2>Customize your QR code</h2>
             </div>
-            <div className="field">
-              <label className="field-label" htmlFor="correction">
-                Error correction
-              </label>
-              <select
-                id="correction"
-                value={settings.errorCorrection}
-                onChange={(event) =>
-                  updateSetting("errorCorrection", event.target.value)
-                }
-              >
-                <option value="L">Low — 7%</option>
-                <option value="M">Medium — 15%</option>
-                <option value="Q">Quartile — 25%</option>
-                <option value="H">High — 30%</option>
-              </select>
-            </div>
-          </div>
 
-          <div className="field">
-            <span className="field-label">Add a logo (optional)</span>
-            <div className="logo-upload">
-              {logo ? (
-                <img className="logo-thumbnail" src={logo} alt="Uploaded logo" />
-              ) : (
-                <span className="upload-icon">＋</span>
-              )}
-              <div className="upload-copy">
-                <strong>{logo ? "Logo selected" : "Upload your logo"}</strong>
-                <span>PNG, JPG, or other image · up to 2 MB</span>
+            <div className="settings-grid">
+              <div className="setting">
+                <label htmlFor="foreground">QR color</label>
+                <div className="color-control">
+                  <input
+                    id="foreground"
+                    type="color"
+                    value={settings.foreground}
+                    onChange={(e) =>
+                      updateSetting("foreground", e.target.value)
+                    }
+                  />
+                  <span>{getColorName(settings.foreground)}</span>
+                </div>
               </div>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => fileRef.current?.click()}
-              >
-                Browse
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={handleLogo}
-              />
+
+              <div className="setting">
+                <label htmlFor="background">Background color</label>
+                <div className="color-control">
+                  <input
+                    id="background"
+                    type="color"
+                    value={settings.background}
+                    onChange={(e) =>
+                      updateSetting("background", e.target.value)
+                    }
+                  />
+                  <span>{getColorName(settings.background)}</span>
+                </div>
+              </div>
+
+              <div className="setting full-width">
+                <div className="label-row">
+                  <label htmlFor="size">QR code size</label>
+                  <span>{settings.size}px</span>
+                </div>
+
+                <input
+                  id="size"
+                  className="range-input"
+                  type="range"
+                  min="150"
+                  max="500"
+                  step="50"
+                  value={settings.size}
+                  onChange={(e) =>
+                    updateSetting("size", Number(e.target.value))
+                  }
+                />
+              </div>
+
+              <div className="setting">
+                <label htmlFor="margin">Quiet zone</label>
+                <select
+                  id="margin"
+                  value={settings.margin}
+                  onChange={(e) =>
+                    updateSetting("margin", Number(e.target.value))
+                  }
+                >
+                  <option value={0}>None</option>
+                  <option value={1}>Small</option>
+                  <option value={2}>Medium</option>
+                  <option value={4}>Large</option>
+                  <option value={6}>Extra large</option>
+                </select>
+              </div>
+
+              <div className="setting">
+                <label htmlFor="errorCorrection">
+                  Error correction
+                </label>
+                <select
+                  id="errorCorrection"
+                  value={settings.errorCorrection}
+                  onChange={(e) =>
+                    updateSetting("errorCorrection", e.target.value)
+                  }
+                >
+                  <option value="L">Low — 7%</option>
+                  <option value="M">Medium — 15%</option>
+                  <option value="Q">Quartile — 25%</option>
+                  <option value="H">High — 30%</option>
+                </select>
+              </div>
             </div>
-            {logo && (
-              <button
-                className="text-button"
-                type="button"
-                onClick={() => setLogo("")}
-              >
-                Remove logo
-              </button>
-            )}
+
+            {error && <p className="error-message">{error}</p>}
+
+            <button
+              className="primary-button"
+              onClick={() => generateQR()}
+              disabled={loading}
+            >
+              {loading ? "Generating..." : "Generate QR Code"}
+              {!loading && <span>↗</span>}
+            </button>
           </div>
 
-          {error && <p className="error-message" role="alert">{error}</p>}
+          <div className="panel preview-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="step">STEP 03</span>
+                <h2>Your QR code</h2>
+              </div>
+              <span className="status-dot">
+                {qrImage ? "Ready" : "Waiting"}
+              </span>
+            </div>
+
+            <div className="qr-preview">
+              {qrImage ? (
+                <img
+                  className="qr-image"
+                  src={qrImage}
+                  alt="Generated QR code"
+                />
+              ) : (
+                <div className="empty-preview">
+                  <div className="empty-qr">▦</div>
+                  <h3>Your QR code appears here</h3>
+                  <p>Enter your content and click Generate QR Code.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="preview-info">
+              <span>FORMAT</span>
+              <strong>PNG Image</strong>
+              <span>SIZE</span>
+              <strong>{settings.size} × {settings.size}px</strong>
+            </div>
+
+            <button
+              className="download-button"
+              onClick={downloadQR}
+              disabled={!qrImage}
+            >
+              <span>↓</span> Download PNG
+            </button>
+
+            <p className="privacy-note">
+              Your QR history is saved in this browser.
+            </p>
+          </div>
+        </section>
+
+        
+        <div className="location-section">
+          <h2>Generate Location QR</h2>
+          <p>
+            Enter a place name to create a QR code that opens Google Maps.
+          </p>
+
+          <input
+            className="location-input"
+            type="text"
+            placeholder="Enter a location, e.g. Coimbatore Railway Station"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
 
           <button
             className="primary-button"
-            type="button"
-            onClick={() => generateQr()}
-            disabled={generating}
-          >
-            {generating ? "Generating..." : "Generate QR code"} <span>↗</span>
-          </button>
-          <p className="privacy-note">Your QR content is processed in your browser.</p>
-        </div>
+            onClick={() => {
+            const place = location.trim();
 
-        <aside className="panel preview-panel">
-          <div className="panel-heading">
+      if (!place) {
+        setError("Please enter a location.");
+        return;
+      }
+
+      const mapsUrl =
+        "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent(place);
+
+      setText(mapsUrl);
+      generateQR(mapsUrl);
+    }}
+    >
+    Generate Location QR
+    </button>
+  </div>
+
+        <section className="history-section">
+          <div className="history-heading">
             <div>
-              <h2>Your QR code</h2>
-              <p>Preview and download your creation.</p>
+              <span className="step">YOUR RECENT CODES</span>
+              <h2>QR history</h2>
             </div>
-            <span className="step-number">02</span>
-          </div>
 
-          <div className="qr-preview">
-            {qrImage ? (
-              <img src={qrImage} alt="Generated QR code" />
-            ) : (
-              <div className="empty-qr">
-                <span className="empty-qr-icon">▦</span>
-                <strong>Your QR code goes here</strong>
-                <span>Enter content and click Generate.</span>
-              </div>
+            {history.length > 0 && (
+              <button className="clear-button" onClick={clearHistory}>
+                Clear history
+              </button>
             )}
           </div>
 
-          <div className="preview-meta">
-            <span className={`status-dot ${qrImage ? "ready" : ""}`} />
-            {qrImage ? "QR code ready" : "Waiting for content"}
-          </div>
+          {history.length === 0 ? (
+            <div className="history-empty">
+              Your generated QR codes will appear here.
+            </div>
+          ) : (
+            <div className="history-list">
+              {history.map((item) => (
+                <div className="history-item" key={item.id}>
+                  <img
+                    className="history-image"
+                    src={item.image}
+                    alt="QR code thumbnail"
+                  />
 
-          <button
-            className="primary-button download-button"
-            type="button"
-            onClick={downloadQr}
-            disabled={!qrImage}
-          >
-            Download PNG <span>↓</span>
-          </button>
+                  <div className="history-details">
+                    <strong>{item.text}</strong>
+                    <span>{item.createdAt}</span>
+                  </div>
 
-          <p className="scan-tip">
-            <span>✦</span> Tip: Test your QR code with your phone before sharing.
-          </p>
-        </aside>
-      </section>
+                  <button
+                    className="history-action"
+                    onClick={() => loadHistoryItem(item)}
+                  >
+                    View
+                  </button>
 
-      <section className="history-section">
-        <div className="history-heading">
-          <div>
-            <span className="eyebrow">YOUR RECENT CREATIONS</span>
-            <h2>QR code history</h2>
-            <p>Your last {MAX_HISTORY} QR codes are saved in this browser.</p>
-          </div>
-          {history.length > 0 && (
-            <button className="text-button clear-button" onClick={clearHistory}>
-              Clear history
-            </button>
-          )}
-        </div>
-
-        {history.length === 0 ? (
-          <div className="history-empty">
-            <span>◷</span>
-            <p>Your generated QR codes will appear here.</p>
-          </div>
-        ) : (
-          <div className="history-list">
-            {history.map((entry) => (
-              <article className="history-item" key={entry.id}>
-                <div className="history-symbol">▦</div>
-                <div className="history-content">
-                  <strong title={entry.text}>{entry.text}</strong>
-                  <span>
-                    {entry.size}px · {entry.errorCorrection} correction ·{" "}
-                    {new Date(entry.createdAt).toLocaleString()}
-                  </span>
+                  <button
+                    className="history-delete"
+                    onClick={() => deleteHistoryItem(item.id)}
+                    aria-label="Delete QR code from history"
+                    title="Delete"
+                  >
+                    ×
+                  </button>
                 </div>
-                <button
-                  className="secondary-button"
-                  onClick={() => restoreEntry(entry)}
-                >
-                  Restore
-                </button>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
 
       <footer className="footer">
-        <span>QR Studio</span>
-        <span>Made for sharing ideas.</span>
+        <span>CJ7</span>
+        <span>QR Generator.Powered by VACK Technologies.</span>
       </footer>
-    </main>
+    </div>
   );
 }
+
+export default App;
