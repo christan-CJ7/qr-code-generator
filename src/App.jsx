@@ -1,4 +1,5 @@
 
+import Intro from './Intro.jsx';
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import "./App.css";
@@ -148,12 +149,18 @@ function App() {
 
   return (
     <div className="app">
+      <Intro />
       <header className="header">
+      
+        
         <div className="brand">
           <div className="brand-icon">CJ</div>
           <span>CJ7</span>
         </div>
+        
         <span className="header-label">Free QR Code Generator</span>
+        
+      
       </header>
 
       <main className="main">
@@ -175,7 +182,7 @@ function App() {
           <div className="panel input-panel">
             <div className="panel-heading">
               <div>
-                <span className="step">STEP 01</span>
+                
                 <h2>Enter your content</h2>
               </div>
               <span className="heading-icon">✎</span>
@@ -192,7 +199,7 @@ function App() {
             />
 
             <div className="settings-heading">
-              <span className="step">STEP 02</span>
+              
               <h2>Customize your QR code</h2>
             </div>
 
@@ -298,7 +305,7 @@ function App() {
           <div className="panel preview-panel">
             <div className="panel-heading">
               <div>
-                <span className="step">STEP 03</span>
+                
                 <h2>Your QR code</h2>
               </div>
               <span className="status-dot">
@@ -315,7 +322,7 @@ function App() {
                 />
               ) : (
                 <div className="empty-preview">
-                  <div className="empty-qr">▦</div>
+                  <div className="empty-qr">...</div>
                   <h3>Your QR code appears here</h3>
                   <p>Enter your content and click Generate QR Code.</p>
                 </div>

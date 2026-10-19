@@ -1,0 +1,253 @@
+
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #fff5f5;
+  animation: introFadeIn 0.5s ease both;
+}
+
+.intro-card {
+  position: relative;
+  width: min(700px, 100%);
+  min-height: 490px;
+  overflow: hidden;
+  border: 1px solid #f5d5d5;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgb(150 20 20 / 12%);
+}
+
+.intro-top,
+.intro-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+}
+
+.intro-top {
+  border-bottom: 1px solid #f7e5e5;
+}
+
+.intro-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #242424;
+  font-weight: 800;
+}
+
+.intro-logo {
+  color: #dc2626;
+  font-size: 25px;
+  font-weight: 900;
+}
+
+.intro-skip {
+  border: 1px solid #f0caca;
+  border-radius: 20px;
+  padding: 9px 14px;
+  background: white;
+  color: #dc2626;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.intro-skip:hover {
+  background: #fff0f0;
+}
+
+.intro-content {
+  position: relative;
+  display: flex;
+  min-height: 340px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 35px 24px 55px;
+  text-align: center;
+  animation: introSlideIn 0.6s ease both;
+}
+
+.intro-symbol {
+  display: grid;
+  width: 65px;
+  height: 65px;
+  place-items: center;
+  border-radius: 20px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 36px;
+  animation: introFloat 2s ease-in-out infinite;
+}
+
+.intro-counter {
+  margin-top: 20px;
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.intro-content h1 {
+  margin: 12px 0;
+  color: #171717;
+  font-size: clamp(26px, 5vw, 38px);
+  font-weight: 850;
+}
+
+.intro-content p {
+  max-width: 440px;
+  margin: 0;
+  color: #666;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.intro-qr {
+  display: grid;
+  width: 75px;
+  height: 75px;
+  margin-top: 24px;
+  place-items: center;
+  border: 5px solid #fff0f0;
+  border-radius: 8px;
+  background: #dc2626;
+  animation: introPulse 1.8s ease-in-out infinite;
+}
+
+.intro-qr-inner {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: repeat(3, 1fr);
+  color: white;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.intro-qr-inner span {
+  display: grid;
+  place-items: center;
+}
+
+.intro-bottom {
+  border-top: 1px solid #f7e5e5;
+}
+
+.intro-dots {
+  display: flex;
+  gap: 7px;
+}
+
+.intro-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 10px;
+  background: #f3cccc;
+  transition: all 0.3s ease;
+}
+
+.intro-dots span.active {
+  width: 25px;
+  background: #dc2626;
+}
+
+.intro-duration {
+  color: #777;
+  font-size: 12px;
+}
+
+.intro-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: #fee2e2;
+}
+
+.intro-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: #dc2626;
+  transform-origin: left;
+  animation: introProgress 30s linear forwards;
+}
+
+@keyframes introFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes introSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes introFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes introPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@keyframes introProgress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (max-width: 480px) {
+  .intro-card {
+    min-height: 450px;
+    border-radius: 18px;
+  }
+
+  .intro-top,
+  .intro-bottom {
+    padding: 16px;
+  }
+
+  .intro-content {
+    min-height: 320px;
+    padding: 25px 18px 35px;
+  }
+
+  .intro-brand {
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .intro-logo {
+    font-size: 21px;
+  }
+
+  .intro-skip {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-overlay,
+  .intro-content,
+  .intro-symbol,
+  .intro-qr,
+  .intro-progress-bar {
+    animation: none;
+  }
+}
