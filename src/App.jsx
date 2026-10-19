@@ -1,5 +1,5 @@
 
-import Intro from './Intro.jsx';
+import Intro from './intro.jsx';
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import "./App.css";
